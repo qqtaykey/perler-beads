@@ -1,0 +1,46 @@
+name: Build Desktop App
+on:
+  workflow_dispatch: # 手动触发（最省事）
+  push:
+    branches: [main] # 推送到 main 自动打包（可选）
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js（静态导出）
+        run: |
+          echo 'export default { output: "export", distDir: "out", trailingSlash: true }' > next.config.ts
+          npm run build
+
+      - name: Use Pake 一键打包桌面版
+        run: |
+          npm install -g pake-cli
+          pake ./out/index.html --name=拼豆生成器 --icon=public/favicon.ico --no-config
+        shell: bash
+
+      - name: Upload 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: 桌面安装包-${{ matrix.platform }}
+          path: |
+            *.exe
+            *.dmg
+            *.deb
